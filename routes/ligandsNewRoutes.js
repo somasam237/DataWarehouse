@@ -7,6 +7,7 @@ const ligandsNewController = new LigandsNewController();
 
 // Basic CRUD operations
 router.get('/', ligandsNewController.getAllLigands.bind(ligandsNewController));
+router.get('/count', ligandsNewController.getCount.bind(ligandsNewController));
 router.get('/statistics', ligandsNewController.getLigandStatistics.bind(ligandsNewController));
 router.get('/top-ligands', ligandsNewController.getTopLigands.bind(ligandsNewController));
 router.get('/top-chemical-formulas', ligandsNewController.getTopChemicalFormulas.bind(ligandsNewController));

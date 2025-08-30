@@ -107,6 +107,38 @@ class AuthorsFundingController {
         }
     }
 
+    // GET /api/authors-funding/count
+    async getCount(req, res) {
+        try {
+            const count = await this.authorsFundingModel.getCount();
+            res.json({ count });
+        } catch (error) {
+            console.error('Error fetching authors/funding count:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    // GET /api/authors-funding/search
+    async searchAuthorsFunding(req, res) {
+        try {
+            const { search, limit = 50, offset = 0 } = req.query;
+            
+            if (!search) {
+                return res.status(400).json({ error: 'Search term is required' });
+            }
+            
+            const results = await this.authorsFundingModel.search(search, {
+                limit: parseInt(limit),
+                offset: parseInt(offset)
+            });
+
+            res.json(results);
+        } catch (error) {
+            console.error('Error searching authors/funding:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
     // GET /api/authors-funding/top-funding-organizations
     async getTopFundingOrganizations(req, res) {
         try {

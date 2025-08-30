@@ -7,6 +7,8 @@ const authorsFundingController = new AuthorsFundingController();
 
 // Basic CRUD operations
 router.get('/', authorsFundingController.getAllAuthorsFunding.bind(authorsFundingController));
+router.get('/count', authorsFundingController.getCount.bind(authorsFundingController));
+router.get('/search', authorsFundingController.searchAuthorsFunding.bind(authorsFundingController));
 router.get('/statistics', authorsFundingController.getFundingStatistics.bind(authorsFundingController));
 router.get('/top-funding-organizations', authorsFundingController.getTopFundingOrganizations.bind(authorsFundingController));
 router.get('/funding-by-location', authorsFundingController.getFundingByLocation.bind(authorsFundingController));
@@ -23,3 +25,4 @@ router.put('/:id', authorsFundingController.updateAuthorsFunding.bind(authorsFun
 router.delete('/:id', authorsFundingController.deleteAuthorsFunding.bind(authorsFundingController));
 
 module.exports = router;
+                                                         

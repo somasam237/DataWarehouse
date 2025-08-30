@@ -7,19 +7,83 @@ class ProteinInfoModel extends BaseModel {
         super('protein_info', 'pdb_id');
     }
 
+    // Override readOne to support case-insensitive PDB ID lookups
+    async readOne(pdbId) {
+        try {
+            const query = `SELECT * FROM ${this.tableName} WHERE LOWER(${this.primaryKey}) = LOWER($1)`;
+            const result = await pool.query(query, [pdbId]);
+            return result.rows[0] || null;
+        } catch (error) {
+            throw new Error(`Error reading ${this.tableName} with PDB ID ${pdbId}: ${error.message}`);
+        }
+    }
+
+    // Override update to support case-insensitive PDB ID lookups
+    async update(pdbId, recordData) {
+        try {
+            // Define valid columns for protein_info table
+            const validColumns = [
+                'pdb_id', 'title', 'classification', 'organism', 'expression_system', 
+                'mutations', 'deposited_date', 'released_date', 'molecular_weight_kda', 
+                'atom_count', 'residue_count_modeled', 'residue_count_deposited', 
+                'unique_chains', 'global_symmetry', 'global_stoichiometry', 'image_url'
+            ];
+            
+            // Filter out invalid fields
+            const filteredData = {};
+            Object.keys(recordData).forEach(key => {
+                if (validColumns.includes(key)) {
+                    filteredData[key] = recordData[key];
+                }
+            });
+            
+            const fields = Object.keys(filteredData);
+            const values = Object.values(filteredData);
+            
+            if (fields.length === 0) {
+                throw new Error('No valid fields to update');
+            }
+            
+            const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
+            
+            const query = `
+                UPDATE ${this.tableName} 
+                SET ${setClause}
+                WHERE LOWER(${this.primaryKey}) = LOWER($1) 
+                RETURNING *
+            `;
+            
+            const result = await pool.query(query, [pdbId, ...values]);
+            return result.rows[0] || null;
+        } catch (error) {
+            throw new Error(`Error updating ${this.tableName} with PDB ID ${pdbId}: ${error.message}`);
+        }
+    }
+
+    // Override delete to support case-insensitive PDB ID lookups
+    async delete(pdbId) {
+        try {
+            const query = `DELETE FROM ${this.tableName} WHERE LOWER(${this.primaryKey}) = LOWER($1) RETURNING *`;
+            const result = await pool.query(query, [pdbId]);
+            return result.rows[0] || null;
+        } catch (error) {
+            throw new Error(`Error deleting ${this.tableName} with PDB ID ${pdbId}: ${error.message}`);
+        }
+    }
+
     // Get all proteins with pagination and sorting
     async readAll(options = {}) {
         const { limit = 50, offset = 0, sortBy = 'pdb_id', sortOrder = 'ASC' } = options;
-        const validSortColumns = ['pdb_id', 'title', 'deposited_date', 'classification', 'resolution_a'];
-        const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'pdb_id';
-        const sortDirection = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+        const validSortOrder = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+        const validSortBy = ['pdb_id', 'title', 'organism', 'classification', 'molecular_weight', 'deposited_date']
+            .includes(sortBy) ? sortBy : 'pdb_id';
 
         const query = `
             SELECT * FROM ${this.tableName}
-            ORDER BY ${sortColumn} ${sortDirection}
+            ORDER BY ${validSortBy} ${validSortOrder}
             LIMIT $1 OFFSET $2
         `;
-        
+
         const result = await pool.query(query, [limit, offset]);
         return result.rows;
     }
@@ -42,85 +106,52 @@ class ProteinInfoModel extends BaseModel {
     // Advanced search with multiple criteria
     async advancedSearch(criteria, options = {}) {
         const { limit = 50, offset = 0 } = options;
-        const conditions = [];
-        const values = [];
-        let paramIndex = 1;
+        const whereClauses = [];
+        const params = [];
 
         if (criteria.title) {
-            conditions.push(`title ILIKE $${paramIndex}`);
-            values.push(`%${criteria.title}%`);
-            paramIndex++;
+            params.push(`%${criteria.title}%`);
+            whereClauses.push(`title ILIKE $${params.length}`);
         }
-
-        if (criteria.classification) {
-            conditions.push(`classification ILIKE $${paramIndex}`);
-            values.push(`%${criteria.classification}%`);
-            paramIndex++;
+        if (criteria.pdb_id) {
+            params.push(`%${criteria.pdb_id}%`);
+            whereClauses.push(`pdb_id ILIKE $${params.length}`);
         }
-
         if (criteria.organism) {
-            conditions.push(`organism ILIKE $${paramIndex}`);
-            values.push(`%${criteria.organism}%`);
-            paramIndex++;
+            params.push(`%${criteria.organism}%`);
+            whereClauses.push(`organism ILIKE $${params.length}`);
         }
-
-        if (criteria.deposited_date_from) {
-            conditions.push(`deposited_date >= $${paramIndex}`);
-            values.push(criteria.deposited_date_from);
-            paramIndex++;
+        if (criteria.classification) {
+            params.push(`%${criteria.classification}%`);
+            whereClauses.push(`classification ILIKE $${params.length}`);
         }
-
-        if (criteria.deposited_date_to) {
-            conditions.push(`deposited_date <= $${paramIndex}`);
-            values.push(criteria.deposited_date_to);
-            paramIndex++;
-        }
-
         if (criteria.min_molecular_weight) {
-            conditions.push(`molecular_weight_kda >= $${paramIndex}`);
-            values.push(criteria.min_molecular_weight);
-            paramIndex++;
+            params.push(criteria.min_molecular_weight);
+            whereClauses.push(`molecular_weight >= $${params.length}`);
         }
-
         if (criteria.max_molecular_weight) {
-            conditions.push(`molecular_weight_kda <= $${paramIndex}`);
-            values.push(criteria.max_molecular_weight);
-            paramIndex++;
+            params.push(criteria.max_molecular_weight);
+            whereClauses.push(`molecular_weight <= $${params.length}`);
+        }
+        if (criteria.start_date) {
+            params.push(criteria.start_date);
+            whereClauses.push(`deposited_date >= $${params.length}`);
+        }
+        if (criteria.end_date) {
+            params.push(criteria.end_date);
+            whereClauses.push(`deposited_date <= $${params.length}`);
         }
 
-        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-        
+        const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
         const query = `
             SELECT * FROM ${this.tableName}
             ${whereClause}
             ORDER BY pdb_id
-            LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+            LIMIT $${params.length + 1} OFFSET $${params.length + 2}
         `;
-        
-        values.push(limit, offset);
-        const result = await pool.query(query, values);
-        return result.rows;
-    }
 
-    // Get protein statistics
-    async getStatistics() {
-        const query = `
-            SELECT 
-                COUNT(*) as total_proteins,
-                COUNT(DISTINCT classification) as unique_classifications,
-                AVG(molecular_weight_kda) as avg_molecular_weight,
-                MIN(molecular_weight_kda) as min_molecular_weight,
-                MAX(molecular_weight_kda) as max_molecular_weight,
-                MIN(deposited_date) as earliest_date,
-                MAX(deposited_date) as latest_date,
-                AVG(atom_count) as avg_atom_count,
-                AVG(residue_count_modeled) as avg_residue_count
-            FROM ${this.tableName}
-            WHERE molecular_weight_kda IS NOT NULL
-        `;
-        
-        const result = await pool.query(query);
-        return result.rows[0];
+        const result = await pool.query(query, [...params, limit, offset]);
+        return result.rows;
     }
 
     // Get proteins by classification
@@ -132,7 +163,7 @@ class ProteinInfoModel extends BaseModel {
             ORDER BY pdb_id
             LIMIT $2 OFFSET $3
         `;
-        
+
         const result = await pool.query(query, [`%${classification}%`, limit, offset]);
         return result.rows;
     }
@@ -156,89 +187,85 @@ class ProteinInfoModel extends BaseModel {
         const { limit = 50, offset = 0 } = options;
         const query = `
             SELECT * FROM ${this.tableName}
-            WHERE molecular_weight_kda BETWEEN $1 AND $2
-            ORDER BY molecular_weight_kda
+            WHERE molecular_weight BETWEEN $1 AND $2
+            ORDER BY molecular_weight
             LIMIT $3 OFFSET $4
         `;
-        
+
         const result = await pool.query(query, [minWeight, maxWeight, limit, offset]);
         return result.rows;
     }
 
-    // Get proteins by deposition date range
+    // Get proteins by date range
     async getByDateRange(startDate, endDate, options = {}) {
         const { limit = 50, offset = 0 } = options;
         const query = `
             SELECT * FROM ${this.tableName}
             WHERE deposited_date BETWEEN $1 AND $2
-            ORDER BY deposited_date DESC
+            ORDER BY deposited_date
             LIMIT $3 OFFSET $4
         `;
-        
+
         const result = await pool.query(query, [startDate, endDate, limit, offset]);
         return result.rows;
     }
 
-    // Get classification distribution
-    async getClassificationDistribution() {
+    // Statistics and distributions
+    async getStatistics() {
         const query = `
             SELECT 
-                classification,
-                COUNT(*) as count,
-                AVG(molecular_weight_kda) as avg_molecular_weight
+                COUNT(*) AS total_proteins,
+                AVG(molecular_weight) AS avg_molecular_weight,
+                MIN(molecular_weight) AS min_molecular_weight,
+                MAX(molecular_weight) AS max_molecular_weight
             FROM ${this.tableName}
-            WHERE classification IS NOT NULL
+        `;
+
+        const result = await pool.query(query);
+        return result.rows[0];
+    }
+
+    // Get total count of records
+    async getCount() {
+        const query = `SELECT COUNT(*) FROM ${this.tableName}`;
+        const result = await pool.query(query);
+        return parseInt(result.rows[0].count);
+    }
+
+    async getClassificationDistribution() {
+        const query = `
+            SELECT classification, COUNT(*) AS count
+            FROM ${this.tableName}
             GROUP BY classification
             ORDER BY count DESC
         `;
-        
+
         const result = await pool.query(query);
         return result.rows;
     }
 
-    // Get organism distribution
     async getOrganismDistribution() {
         const query = `
-            SELECT 
-                organism,
-                COUNT(*) as count,
-                AVG(molecular_weight_kda) as avg_molecular_weight
+            SELECT organism, COUNT(*) AS count
             FROM ${this.tableName}
-            WHERE organism IS NOT NULL
             GROUP BY organism
             ORDER BY count DESC
-            LIMIT 50
         `;
-        
+
         const result = await pool.query(query);
         return result.rows;
     }
 
-    // Get molecular weight distribution
     async getMolecularWeightDistribution() {
         const query = `
             SELECT 
-                CASE 
-                    WHEN molecular_weight_kda < 10 THEN '<10 kDa'
-                    WHEN molecular_weight_kda < 25 THEN '10-25 kDa'
-                    WHEN molecular_weight_kda < 50 THEN '25-50 kDa'
-                    WHEN molecular_weight_kda < 100 THEN '50-100 kDa'
-                    ELSE '>100 kDa'
-                END as weight_range,
-                COUNT(*) as count
+                width_bucket(molecular_weight, 0, 500000, 10) AS bucket,
+                COUNT(*) AS count
             FROM ${this.tableName}
-            WHERE molecular_weight_kda IS NOT NULL
-            GROUP BY weight_range
-            ORDER BY 
-                CASE 
-                    WHEN molecular_weight_kda < 10 THEN 1
-                    WHEN molecular_weight_kda < 25 THEN 2
-                    WHEN molecular_weight_kda < 50 THEN 3
-                    WHEN molecular_weight_kda < 100 THEN 4
-                    ELSE 5
-                END
+            GROUP BY bucket
+            ORDER BY bucket
         `;
-        
+
         const result = await pool.query(query);
         return result.rows;
     }

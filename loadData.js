@@ -7,9 +7,16 @@ require('dotenv').config();
 const  pool = require('./db'); // Import the database pool
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
 
 // Directory where your downloaded .cif files are located
 const cifFilesDirectory = path.join(__dirname, '../data/cif_files');
+const imagesOutputDir = path.join(__dirname, 'public/protein_images');
+
+// Ensure images directory exists
+if (!fs.existsSync(imagesOutputDir)) {
+    fs.mkdirSync(imagesOutputDir, { recursive: true });
+}
 
 // --- Helper function for basic CIF parsing ---
 // This function attempts to extract a single value associated with a tag.
@@ -107,14 +114,37 @@ function parseCifLoop(cifContent, loopStartTag) {
     return data;
 }
 
-// Build a reliable RCSB CDN image URL as fallback when CIF lacks one
+// Generate a PNG image using PyMOL CLI
+function generateImageWithPyMOL(cifPath, outPngPath) {
+    return new Promise((resolve) => {
+        const pymolArgs = [
+            '-cq',
+            '-d',
+            `load "${cifPath}"; hide everything; show cartoon; bg_color white; set ray_opaque_background, off; ray 800,600; png "${outPngPath}"; quit`
+        ];
+        const child = execFile('pymol', pymolArgs, { windowsHide: true }, (error) => {
+            if (error) {
+                console.warn('PyMOL rendering failed:', error.message);
+                return resolve(false);
+            }
+            resolve(true);
+        });
+        // Safety timeout in case PyMOL hangs
+        setTimeout(() => {
+            try { child.kill(); } catch (_) {}
+            resolve(fs.existsSync(outPngPath));
+        }, 30000);
+    });
+}
+
+// Build a reliable RCSB CDN image URL as fallback when CIF lacks one (kept as last resort)
 function getRcsbImageUrl(pdbId) {
     if (!pdbId) return null;
     const idLower = pdbId.toLowerCase();
-    // For 4-char PDB IDs, directory is the middle two characters (positions 1-2 zero-based)
+    // For 4-char PDB IDs, directory is the FIRST two characters
     if (idLower.length === 4) {
-        const midTwo = idLower.substring(1, 3);
-        return `https://cdn.rcsb.org/images/structures/${midTwo}/${idLower}/${idLower}.png`;
+        const firstTwo = idLower.substring(0, 2);
+        return `https://cdn.rcsb.org/images/structures/${firstTwo}/${idLower}/${idLower}.png`;
     }
     // Fallback generic path
     return `https://cdn.rcsb.org/images/structures/${idLower}.png`;
@@ -150,9 +180,25 @@ async function loadProteins() {
             const expression_system = (getCifValue(fullCifData, '_entity_src_gen.pdbx_gene_src_scientific_name') || '').substring(0, 255);
             const mutations = getCifValue(fullCifData, '_entity_src_gen.pdbx_gene_src_variant') || null;
 
-            // Extract image URL if present, otherwise fallback to RCSB CDN
-            const image_url_from_cif = getCifValue(fullCifData, '_struct.pdbx_model_image_url') || null;
-            const image_url = image_url_from_cif || getRcsbImageUrl(pdb_id);
+            // Choose image path: prefer existing PNG, else render via PyMOL, else CDN
+            const localPngPath = path.join(imagesOutputDir, `${pdb_id}.png`);
+            let image_url_from_cif = getCifValue(fullCifData, '_struct.pdbx_model_image_url') || null;
+            let image_url = null;
+
+            // If we already have a local PNG, use it
+            if (fs.existsSync(localPngPath)) {
+                image_url = `/static/protein_images/${pdb_id}.png`;
+            } else {
+                // Try PyMOL rendering
+                const rendered = await generateImageWithPyMOL(filePath, localPngPath);
+                if (rendered && fs.existsSync(localPngPath)) {
+                    image_url = `/static/protein_images/${pdb_id}.png`;
+                } else if (image_url_from_cif) {
+                    image_url = image_url_from_cif;
+                } else {
+                    image_url = getRcsbImageUrl(pdb_id);
+                }
+            }
 
             const deposited_date_str = getCifValue(fullCifData, '_pdbx_database_status.recvd_initial_deposition_date');
             const deposited_date = deposited_date_str && deposited_date_str !== '?' ? new Date(deposited_date_str) : null;
@@ -412,7 +458,12 @@ async function loadProteins() {
             // --- 6. Extract and Insert into 'Software_Used' table ---
             await client.query('DELETE FROM Software_Used WHERE pdb_id = $1', [pdb_id]);
 
-            let softwareLoopData = parseCifLoop(fullCifData, 'loop_ _software.');
+            let softwareLoopData = parseCifLoop(fullCifData, 'loop_');
+            // Filter to only include software-related records
+            softwareLoopData = softwareLoopData.filter(record => 
+                record['_software.name'] && record['_software.classification']
+            );
+            
             if (softwareLoopData.length === 0) {
                 // Fallback: try to extract single-value tags
                 const software_name = getCifValue(fullCifData, '_software.name');

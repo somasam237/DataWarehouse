@@ -128,6 +128,50 @@ class MacromoleculeController {
         }
     }
 
+    // GET /api/macromolecules/count
+    async getCount(req, res) {
+        try {
+            const count = await this.macromoleculeModel.getCount();
+            res.json({ count });
+        } catch (error) {
+            console.error('Error fetching macromolecule count:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    // GET /api/macromolecules/search
+    async searchMacromolecules(req, res) {
+        try {
+            const { search, limit = 50, offset = 0 } = req.query;
+            
+            if (!search) {
+                return res.status(400).json({ error: 'Search term is required' });
+            }
+            
+            const results = await this.macromoleculeModel.search(search, {
+                limit: parseInt(limit),
+                offset: parseInt(offset)
+            });
+
+            res.json(results);
+        } catch (error) {
+            console.error('Error searching macromolecules:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    // GET /api/macromolecules/pdb/:pdb_id
+    async getByPdbId(req, res) {
+        try {
+            const { pdb_id } = req.params;
+            const records = await this.macromoleculeModel.getByPdbId(pdb_id);
+            res.json(records);
+        } catch (error) {
+            console.error('Error fetching macromolecules by PDB ID:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
     // GET /api/macromolecules/sequence-length-distribution
     async getSequenceLengthDistribution(req, res) {
         try {

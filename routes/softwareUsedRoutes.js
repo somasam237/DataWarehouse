@@ -7,6 +7,7 @@ const softwareUsedController = new SoftwareUsedController();
 
 // Basic CRUD operations
 router.get('/', softwareUsedController.getAllSoftware.bind(softwareUsedController));
+router.get('/count', softwareUsedController.getCount.bind(softwareUsedController));
 router.get('/statistics', softwareUsedController.getSoftwareStatistics.bind(softwareUsedController));
 router.get('/top-software', softwareUsedController.getTopSoftware.bind(softwareUsedController));
 router.get('/by-classification', softwareUsedController.getSoftwareByClassification.bind(softwareUsedController));

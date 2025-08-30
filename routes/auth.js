@@ -9,8 +9,23 @@ const router = express.Router();
 
 // Register
 router.post("/register", async (req, res) => {
+  console.log('Registration request received:', { name: req.body.name, email: req.body.email });
+  console.log('Request body:', req.body);
   const { name, email, password } = req.body;
+  
+  // Validate required fields
+  if (!name || !email || !password) {
+    console.log('Missing required fields:', { name: !!name, email: !!email, password: !!password });
+    return res.status(400).json({ error: "All fields are required" });
+  }
+  
   try {
+    // Check if user already exists
+    const existingUser = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+
     // 1. Hash password
     const hashed = await bcrypt.hash(password, 10);
 
@@ -18,40 +33,63 @@ router.post("/register", async (req, res) => {
     const emailToken = crypto.randomBytes(48).toString("hex");
 
     // 3. Save user with token and unverified status
-    await pool.query(
-      "INSERT INTO users (name, email, password, email_token, email_verified) VALUES ($1, $2, $3, $4, $5)",
+    const result = await pool.query(
+      "INSERT INTO users (name, email, password, email_token, email_verified) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email",
       [name, email, hashed, emailToken, false]
     );
 
-    // 4. Send verification email
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const user = result.rows[0];
 
-    const url = `http://localhost:3000/verify-email?token=${emailToken}`;
-    await transporter.sendMail({
-      to: email,
-      subject: "Verify your email address",
-      html: `
-        <h2>Welcome to DataWarehouse2025!</h2>
-        <p>Thank you for registering. Please confirm your email address by clicking the link below:</p>
-        <a href="${url}">Verify Email</a>
-        <p>If you did not create this account, please ignore this email.</p>
-      `,
-    });
+    // 4. Send verification email (if email service is configured)
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        });
 
-    // 5. Always send a generic message for security
-    res.json({ message: "Registration successful! Please check your email to verify your account." });
+        const url = `http://localhost:3000/verify-email?token=${emailToken}`;
+        await transporter.sendMail({
+          to: email,
+          subject: "Welcome to Protein Data Warehouse!",
+          html: `
+            <h2>Welcome to Protein Data Warehouse!</h2>
+            <p>Hello ${name},</p>
+            <p>Thank you for registering with Protein Data Warehouse. Please confirm your email address by clicking the link below:</p>
+            <a href="${url}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">Verify Email</a>
+            <p>If you did not create this account, please ignore this email.</p>
+            <p>Best regards,<br>The Protein Data Warehouse Team</p>
+          `,
+        });
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
+        // Continue with registration even if email fails
+      }
+    }
+
+    // 5. Return success response
+    res.json({ 
+      message: "Registration successful! Please check your email to verify your account.",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    });
   } catch (err) {
+    console.error('Registration error:', err);
+    console.error('Error details:', {
+      message: err.message,
+      code: err.code,
+      stack: err.stack
+    });
     if (err.code === '23505') {
-      // Do not reveal if email is taken
-      res.status(400).json({ error: "Registration failed. Please check your details." });
+      res.status(400).json({ error: "Email already registered" });
     } else {
-      res.status(500).json({ error: "Server error" });
+      res.status(500).json({ error: "Server error during registration", details: err.message });
     }
   }
 });
@@ -88,8 +126,23 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Incorrect password" });
     }
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-    res.json({ message: "Login successful", token });
+    // Check if email is verified (optional for now)
+    // if (!user.email_verified) {
+    //   return res.status(400).json({ error: "Please verify your email before logging in" });
+    // }
+
+    const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+    console.log('Using JWT secret:', jwtSecret ? 'Secret is set' : 'Using default secret');
+    const token = jwt.sign({ id: user.id }, jwtSecret, { expiresIn: "24h" });
+    res.json({ 
+      message: "Login successful", 
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -111,17 +164,24 @@ router.post("/forgot-password", async (req, res) => {
       [resetToken, resetTokenExpiry, email]
     );
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    });
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      });
 
-    const url = `http://localhost:3000/reset-password?token=${resetToken}`;
-    await transporter.sendMail({
-      to: email,
-      subject: "Password Reset",
-      html: `<p>Click <a href="${url}">here</a> to reset your password. This link expires in 1 hour.</p>`,
-    });
+      const url = `http://localhost:3000/reset-password?token=${resetToken}`;
+      await transporter.sendMail({
+        to: email,
+        subject: "Password Reset - Protein Data Warehouse",
+        html: `
+          <h2>Password Reset Request</h2>
+          <p>You requested a password reset for your Protein Data Warehouse account.</p>
+          <a href="${url}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">Reset Password</a>
+          <p>This link expires in 1 hour. If you didn't request this, please ignore this email.</p>
+        `,
+      });
+    }
 
     res.json({ message: "Password reset email sent." });
   } catch (err) {

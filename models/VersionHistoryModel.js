@@ -96,6 +96,34 @@ class VersionHistoryModel extends BaseModel {
         const result = await pool.query(query, values);
         return result.rows;
     }
+
+    // Get revision type distribution
+    async getRevisionTypeDistribution() {
+        const query = `
+            SELECT 
+                CASE 
+                    WHEN changes ILIKE '%initial%' THEN 'Initial Release'
+                    WHEN changes ILIKE '%update%' THEN 'Update'
+                    WHEN changes ILIKE '%correction%' THEN 'Correction'
+                    WHEN changes ILIKE '%revision%' THEN 'Revision'
+                    ELSE 'Other'
+                END as revision_type,
+                COUNT(*) as count
+            FROM ${this.tableName}
+            GROUP BY revision_type
+            ORDER BY count DESC
+        `;
+        
+        const result = await pool.query(query);
+        return result.rows;
+    }
+
+    // Get total count of records
+    async getCount() {
+        const query = `SELECT COUNT(*) FROM ${this.tableName}`;
+        const result = await pool.query(query);
+        return parseInt(result.rows[0].count);
+    }
 }
 
 module.exports = VersionHistoryModel;

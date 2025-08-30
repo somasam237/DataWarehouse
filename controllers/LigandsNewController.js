@@ -166,6 +166,17 @@ class LigandsNewController {
         }
     }
 
+    // GET /api/ligands-new/count
+    async getCount(req, res) {
+        try {
+            const count = await this.ligandsModel.getCount();
+            res.json({ count });
+        } catch (error) {
+            console.error('Error fetching ligands count:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
     // GET /api/ligands-new/top-ligands
     async getTopLigands(req, res) {
         try {

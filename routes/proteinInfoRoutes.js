@@ -7,6 +7,7 @@ const proteinInfoController = new ProteinInfoController();
 
 // Basic CRUD operations
 router.get('/', proteinInfoController.getAllProteins.bind(proteinInfoController));
+router.get('/count', proteinInfoController.getCount.bind(proteinInfoController));
 router.get('/search', proteinInfoController.searchProteinsGet.bind(proteinInfoController));
 router.get('/statistics', proteinInfoController.getStatistics.bind(proteinInfoController));
 router.get('/classification-distribution', proteinInfoController.getClassificationDistribution.bind(proteinInfoController));

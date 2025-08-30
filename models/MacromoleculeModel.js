@@ -146,6 +146,69 @@ class MacromoleculeModel extends BaseModel {
         const result = await pool.query(query, values);
         return result.rows;
     }
+
+    // Get sequence length distribution
+    async getSequenceLengthDistribution() {
+        const query = `
+            SELECT 
+                CASE 
+                    WHEN sequence_length < 100 THEN '< 100'
+                    WHEN sequence_length < 500 THEN '100-500'
+                    WHEN sequence_length < 1000 THEN '500-1000'
+                    WHEN sequence_length < 2000 THEN '1000-2000'
+                    ELSE '> 2000'
+                END as length_range,
+                COUNT(*) as count
+            FROM ${this.tableName}
+            WHERE sequence_length IS NOT NULL
+            GROUP BY length_range
+            ORDER BY 
+                CASE 
+                    WHEN sequence_length < 100 THEN 1
+                    WHEN sequence_length < 500 THEN 2
+                    WHEN sequence_length < 1000 THEN 3
+                    WHEN sequence_length < 2000 THEN 4
+                    ELSE 5
+                END
+        `;
+        
+        const result = await pool.query(query);
+        return result.rows;
+    }
+
+    // Get total count of records
+    async getCount() {
+        const query = `SELECT COUNT(*) FROM ${this.tableName}`;
+        const result = await pool.query(query);
+        return parseInt(result.rows[0].count);
+    }
+
+    // Search macromolecules by PDB ID or chain ID
+    async search(searchTerm, options = {}) {
+        const { limit = 50, offset = 0 } = options;
+        const query = `
+            SELECT * FROM ${this.tableName}
+            WHERE pdb_id ILIKE $1 OR chain_id ILIKE $2
+            ORDER BY pdb_id
+            LIMIT $3 OFFSET $4
+        `;
+        
+        const searchPattern = `%${searchTerm}%`;
+        const result = await pool.query(query, [searchPattern, searchPattern, limit, offset]);
+        return result.rows;
+    }
+
+    // Get macromolecules by PDB ID
+    async getByPdbId(pdbId) {
+        const query = `
+            SELECT * FROM ${this.tableName}
+            WHERE pdb_id ILIKE $1
+            ORDER BY pdb_id
+        `;
+        
+        const result = await pool.query(query, [pdbId]);
+        return result.rows;
+    }
 }
 
 module.exports = MacromoleculeModel;

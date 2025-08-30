@@ -7,6 +7,9 @@ const macromoleculeController = new MacromoleculeController();
 
 // Basic CRUD operations
 router.get('/', macromoleculeController.getAllMacromolecules.bind(macromoleculeController));
+router.get('/count', macromoleculeController.getCount.bind(macromoleculeController));
+router.get('/search', macromoleculeController.searchMacromolecules.bind(macromoleculeController));
+router.get('/pdb/:pdb_id', macromoleculeController.getByPdbId.bind(macromoleculeController));
 router.get('/statistics', macromoleculeController.getMacromoleculeStatistics.bind(macromoleculeController));
 router.get('/sequence-length-distribution', macromoleculeController.getSequenceLengthDistribution.bind(macromoleculeController));
 router.get('/top-molecule-names', macromoleculeController.getTopMoleculeNames.bind(macromoleculeController));
@@ -14,7 +17,6 @@ router.get('/chain-composition', macromoleculeController.getChainComposition.bin
 router.get('/multi-entity-proteins', macromoleculeController.getMultiEntityProteins.bind(macromoleculeController));
 router.get('/by-sequence-length', macromoleculeController.getBySequenceLengthRange.bind(macromoleculeController));
 router.get('/search/molecule-name', macromoleculeController.searchByMoleculeName.bind(macromoleculeController));
-router.get('/by-pdb/:pdb_id', macromoleculeController.getByPdbId.bind(macromoleculeController));
 router.get('/by-pdb-entity/:pdb_id/:entity_id', macromoleculeController.getByPdbIdAndEntity.bind(macromoleculeController));
 router.get('/:id', macromoleculeController.getMacromoleculeById.bind(macromoleculeController));
 

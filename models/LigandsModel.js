@@ -80,6 +80,13 @@ class LigandsModel extends BaseModel {
         return result.rows[0];
     }
 
+    // Get total count of records
+    async getCount() {
+        const query = `SELECT COUNT(*) FROM ${this.tableName}`;
+        const result = await pool.query(query);
+        return parseInt(result.rows[0].count);
+    }
+
     // Advanced search for ligands
     async advancedSearch(criteria, options = {}) {
         const { limit = 50, offset = 0 } = options;

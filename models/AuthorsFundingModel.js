@@ -100,6 +100,28 @@ class AuthorsFundingModel extends BaseModel {
         return result.rows;
     }
 
+    // Get total count of records
+    async getCount() {
+        const query = `SELECT COUNT(*) FROM ${this.tableName}`;
+        const result = await pool.query(query);
+        return parseInt(result.rows[0].count);
+    }
+
+    // Search authors/funding by PDB ID, author names, or funding organization
+    async search(searchTerm, options = {}) {
+        const { limit = 50, offset = 0 } = options;
+        const query = `
+            SELECT * FROM ${this.tableName}
+            WHERE pdb_id ILIKE $1 OR author_names ILIKE $2 OR funding_org ILIKE $3
+            ORDER BY pdb_id
+            LIMIT $4 OFFSET $5
+        `;
+        
+        const searchPattern = `%${searchTerm}%`;
+        const result = await pool.query(query, [searchPattern, searchPattern, searchPattern, limit, offset]);
+        return result.rows;
+    }
+
     // Get author name frequency
     async getAuthorNameFrequency(options = {}) {
         const { limit = 50 } = options;

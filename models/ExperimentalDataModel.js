@@ -28,8 +28,8 @@ class ExperimentalDataModel extends BaseModel {
     async getByPdbId(pdbId) {
         const query = `
             SELECT * FROM ${this.tableName}
-            WHERE pdb_id = $1
-            ORDER BY id
+            WHERE pdb_id ILIKE $1
+            ORDER BY pdb_id
         `;
         
         const result = await pool.query(query, [pdbId]);
@@ -80,7 +80,7 @@ class ExperimentalDataModel extends BaseModel {
     }
 
     // Get experimental statistics
-    async getExperimentalStatistics() {
+    async getExperimentalDataStatistics() {
         const query = `
             SELECT 
                 COUNT(*) as total_experiments,
@@ -94,6 +94,40 @@ class ExperimentalDataModel extends BaseModel {
         
         const result = await pool.query(query);
         return result.rows[0];
+    }
+
+    // Get total count of records
+    async getCount() {
+        const query = `SELECT COUNT(*) FROM ${this.tableName}`;
+        const result = await pool.query(query);
+        return parseInt(result.rows[0].count);
+    }
+
+    // Search experimental data by PDB ID or method
+    async search(searchTerm, options = {}) {
+        const { limit = 50, offset = 0 } = options;
+        const query = `
+            SELECT * FROM ${this.tableName}
+            WHERE pdb_id ILIKE $1 OR method ILIKE $2
+            ORDER BY pdb_id
+            LIMIT $3 OFFSET $4
+        `;
+        
+        const searchPattern = `%${searchTerm}%`;
+        const result = await pool.query(query, [searchPattern, searchPattern, limit, offset]);
+        return result.rows;
+    }
+
+    // Get experimental data by PDB ID
+    async getByPdbId(pdbId) {
+        const query = `
+            SELECT * FROM ${this.tableName}
+            WHERE pdb_id ILIKE $1
+            ORDER BY pdb_id
+        `;
+        
+        const result = await pool.query(query, [pdbId]);
+        return result.rows;
     }
 
     // Get method distribution

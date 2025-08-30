@@ -3,6 +3,7 @@ const cors = require("cors"); // for react frontend request handling
 //import routes
 const authRoutes = require("./routes/auth");
 require("dotenv").config();
+const path = require('path');
 
 // Routes for 7-table schema (your current database structure)
 const proteinInfoRoutes = require('./routes/proteinInfoRoutes');
@@ -23,6 +24,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Static files (images, etc.)
+app.use('/static', express.static(path.join(__dirname, 'public')));
+
 app.use("/api/auth", authRoutes);
 
 // Route Handlers for 7-table schema (your current database structure)
@@ -31,6 +35,7 @@ app.use('/api/authors-funding', authorsFundingRoutes);
 app.use('/api/experimental-data', experimentalDataRoutes);
 app.use('/api/macromolecules', macromoleculeRoutes);
 app.use('/api/ligands-new', ligandsNewRoutes);
+app.use('/api/ligands', ligandsNewRoutes); // Alias for frontend compatibility
 app.use('/api/software-used', softwareUsedRoutes);
 app.use('/api/version-history', versionHistoryRoutes);
 
@@ -52,7 +57,8 @@ app.get('/health', (req, res) => {
             '/api/macromolecules',
             '/api/ligands-new',
             '/api/software-used',
-            '/api/version-history'
+            '/api/version-history',
+            '/static'
         ]
     });
 });

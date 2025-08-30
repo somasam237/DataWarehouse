@@ -139,6 +139,17 @@ class VersionHistoryController {
         }
     }
 
+    // GET /api/version-history/count
+    async getCount(req, res) {
+        try {
+            const count = await this.versionHistoryModel.getCount();
+            res.json({ count });
+        } catch (error) {
+            console.error('Error fetching version history count:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
     // GET /api/version-history/revision-type-distribution
     async getRevisionTypeDistribution(req, res) {
         try {

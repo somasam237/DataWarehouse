@@ -7,6 +7,7 @@ const versionHistoryController = new VersionHistoryController();
 
 // Basic CRUD operations
 router.get('/', versionHistoryController.getAllVersionHistory.bind(versionHistoryController));
+router.get('/count', versionHistoryController.getCount.bind(versionHistoryController));
 router.get('/statistics', versionHistoryController.getVersionStatistics.bind(versionHistoryController));
 router.get('/revision-type-distribution', versionHistoryController.getRevisionTypeDistribution.bind(versionHistoryController));
 router.get('/most-revised-proteins', versionHistoryController.getMostRevisedProteins.bind(versionHistoryController));

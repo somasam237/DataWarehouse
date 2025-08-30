@@ -128,6 +128,29 @@ class SoftwareUsedController {
         }
     }
 
+    // GET /api/software-used/count
+    async getCount(req, res) {
+        try {
+            const count = await this.softwareUsedModel.getCount();
+            res.json({ count });
+        } catch (error) {
+            console.error('Error fetching software used count:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    // GET /api/software-used/pdb/:pdb_id
+    async getByPdbId(req, res) {
+        try {
+            const { pdb_id } = req.params;
+            const records = await this.softwareUsedModel.getByPdbId(pdb_id);
+            res.json(records);
+        } catch (error) {
+            console.error('Error fetching software used by PDB ID:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
     // GET /api/software-used/top-software
     async getTopSoftware(req, res) {
         try {

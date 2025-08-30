@@ -123,12 +123,56 @@ class ExperimentalDataController {
     }
 
     // GET /api/experimental-data/statistics
-    async getExperimentalStatistics(req, res) {
+    async getExperimentalDataStatistics(req, res) {
         try {
-            const statistics = await this.experimentalDataModel.getExperimentalStatistics();
+            const statistics = await this.experimentalDataModel.getExperimentalDataStatistics();
             res.json(statistics);
         } catch (error) {
-            console.error('Error fetching experimental statistics:', error);
+            console.error('Error fetching experimental data statistics:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    // GET /api/experimental-data/search
+    async searchExperimentalData(req, res) {
+        try {
+            const { search, limit = 50, offset = 0 } = req.query;
+            
+            if (!search) {
+                return res.status(400).json({ error: 'Search term is required' });
+            }
+            
+            const results = await this.experimentalDataModel.search(search, {
+                limit: parseInt(limit),
+                offset: parseInt(offset)
+            });
+
+            res.json(results);
+        } catch (error) {
+            console.error('Error searching experimental data:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    // GET /api/experimental-data/pdb/:pdb_id
+    async getByPdbId(req, res) {
+        try {
+            const { pdb_id } = req.params;
+            const records = await this.experimentalDataModel.getByPdbId(pdb_id);
+            res.json(records);
+        } catch (error) {
+            console.error('Error fetching experimental data by PDB ID:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    // GET /api/experimental-data/count
+    async getCount(req, res) {
+        try {
+            const count = await this.experimentalDataModel.getCount();
+            res.json({ count });
+        } catch (error) {
+            console.error('Error fetching experimental data count:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     }

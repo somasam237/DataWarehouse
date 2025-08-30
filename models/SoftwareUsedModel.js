@@ -81,24 +81,30 @@ class SoftwareUsedModel extends BaseModel {
         return result.rows[0];
     }
 
-    // Get most popular software
+    // Get top software by usage
     async getTopSoftware(options = {}) {
         const { limit = 20 } = options;
         const query = `
             SELECT 
                 software_name,
-                COUNT(*) as usage_count,
                 COUNT(DISTINCT pdb_id) as protein_count,
-                COUNT(DISTINCT version) as version_count
+                COUNT(*) as total_records
             FROM ${this.tableName}
             WHERE software_name IS NOT NULL AND software_name != ''
             GROUP BY software_name
-            ORDER BY usage_count DESC
+            ORDER BY protein_count DESC
             LIMIT $1
         `;
         
         const result = await pool.query(query, [limit]);
         return result.rows;
+    }
+
+    // Get total count of records
+    async getCount() {
+        const query = `SELECT COUNT(*) FROM ${this.tableName}`;
+        const result = await pool.query(query);
+        return parseInt(result.rows[0].count);
     }
 
     // Get software by purpose

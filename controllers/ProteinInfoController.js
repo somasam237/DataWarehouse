@@ -104,6 +104,17 @@ class ProteinInfoController {
         }
     }
 
+    // GET /api/protein-info/count
+    async getCount(req, res) {
+        try {
+            const count = await this.proteinInfoModel.getCount();
+            res.json({ count });
+        } catch (error) {
+            console.error('Error fetching protein count:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
     // GET /api/protein-info/by-classification/:classification
     async getByClassification(req, res) {
         try {

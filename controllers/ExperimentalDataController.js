@@ -231,11 +231,20 @@ class ExperimentalDataController {
     async createExperimentalData(req, res) {
         try {
             const recordData = req.body;
+            console.log('Creating experimental data with:', recordData);
+            
+            // Validate required fields
+            if (!recordData || !recordData.pdb_id) {
+                return res.status(400).json({ error: 'PDB ID is required' });
+            }
+            
             const newRecord = await this.experimentalDataModel.create(recordData);
+            console.log('Created record:', newRecord);
             res.status(201).json(newRecord);
         } catch (error) {
             console.error('Error creating experimental data:', error);
-            res.status(500).json({ error: 'Internal server error' });
+            console.error('Error stack:', error.stack);
+            res.status(500).json({ error: 'Internal server error', details: error.message });
         }
     }
 

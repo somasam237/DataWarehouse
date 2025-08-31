@@ -61,6 +61,11 @@ class BaseModel {
     // 3. create(recordData) - Create a new record
     async create(recordData) {
         try {
+            // Validate that recordData is not empty
+            if (!recordData || Object.keys(recordData).length === 0) {
+                throw new Error('Cannot create record with empty data');
+            }
+            
             const fields = Object.keys(recordData);
             const values = Object.values(recordData);
             const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');

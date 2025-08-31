@@ -4,7 +4,7 @@ const pool = require('../db');
 
 class ExperimentalDataModel extends BaseModel {
     constructor() {
-        super('experimental_data', 'id');
+        super('experimental_data', 'pdb_id');
     }
 
     // Get all experimental data with pagination

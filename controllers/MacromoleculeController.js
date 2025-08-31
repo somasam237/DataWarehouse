@@ -254,11 +254,17 @@ class MacromoleculeController {
     async createMacromolecule(req, res) {
         try {
             const recordData = req.body;
+            
+            // Validate required fields
+            if (!recordData || !recordData.pdb_id) {
+                return res.status(400).json({ error: 'PDB ID is required' });
+            }
+            
             const newRecord = await this.macromoleculeModel.create(recordData);
             res.status(201).json(newRecord);
         } catch (error) {
             console.error('Error creating macromolecule:', error);
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ error: 'Internal server error', details: error.message });
         }
     }
 
